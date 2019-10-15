@@ -1,0 +1,15 @@
+---
+
+### Connection parameters
+act_server: "{{ ansible_host }}"
+act_port: 443
+act_user: admin
+act_password: P@ss1word
+act_validate_certs: false
+act_transport: rest
+act_timeout: 120
+
+### atc service configuration
+act_service: as3
+act_method: POST
+act_declaration: files/example_as3_declaration.json

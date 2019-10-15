@@ -1,0 +1,74 @@
+---
+
+- name: Setup provider
+  set_fact:
+    provider:
+      server: "{{ act_server }}"
+      server_port: "{{ act_port }}"
+      user: "{{ act_user }}"
+      password: "{{ act_password }}"
+      validate_certs: "{{ act_validate_certs }}"
+      transport: "{{ act_transport }}"
+    declaration: "{{ act_declaration }}"
+    method: "{{ act_method }}"
+
+- name: Get authentication token
+  uri:
+    url: "https://{{ provider.server }}:{{ provider.server_port }}/mgmt/shared/authn/login"
+    method: POST
+    timeout: "{{ act_timeout }}"
+    validate_certs: "{{ provider.validate_certs }}"
+    body:
+      username: "{{ provider.user }}"
+      password: "{{ provider.password }}"
+    body_format: json
+  register: authtokenonb
+
+- name: Set the token fact if authentication succeeded
+  set_fact:
+    f5_auth_token: "{{ authtokenonb.json.token.token }}"
+  when: authtokenonb is success
+
+- name: Test authentication
+  uri:
+    url: "https://{{ provider.server }}:{{ provider.server_port }}/mgmt/shared/echo"
+    timeout: "{{ act_timeout }}"
+    validate_certs: "{{ provider.validate_certs }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_auth_token }}"
+  register: status
+
+- name: Setup service DO url
+  set_fact:
+    actUrl: "/mgmt/shared/declarative-onboarding"
+    actCheckUrl: "/mgmt/shared/declarative-onboarding/info"
+  when: act_service == 'do'
+
+- name: Setup service AS3 url
+  set_fact:
+    actUrl: "/mgmt/shared/appsvcs/declare"
+    actCheckUrl: "/mgmt/shared/appsvcs/info"
+  when: act_service == 'as3'
+
+- name: Setup service TS url
+  set_fact:
+    actUrl: "/mgmt/shared/telemetry/declare"
+    actCheckUrl: "/mgmt/shared/telemetry/info"
+  when: act_service == 'ts'
+
+- name: Verify specified automation tool chain service is available
+  uri:
+    url: "https://{{ provider.server }}:{{ provider.server_port }}{{ actCheckUrl }}"
+    timeout: "{{ act_timeout }}"
+    validate_certs: "{{ provider.validate_certs }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_auth_token }}"
+  register: status
+  until:
+    - status is success
+    - status.json is defined
+  retries: 10
+  delay: 6
+
+- name: include declare.yaml
+  include_tasks: declare.yaml
